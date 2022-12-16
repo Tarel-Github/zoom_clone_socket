@@ -1,53 +1,86 @@
-const messageList = document.querySelector("ul");
-const nickForm = document.querySelector("#nick");
-const messageForm = document.querySelector("#message");
-//새로고침하면 이게 작동하고 모든 addEventListener가 설정 됌
-const socket = new WebSocket(`ws://${window.location.host}`);
+const socket = io();
 
-function makeMessage(type, payload) {
-  const msg = { type, payload };
-  return JSON.stringify(msg);
+const welcome = document.getElementById("welcome");
+const form = welcome.querySelector("form");
+const room = document.getElementById("room");
+
+room.hidden = true;
+
+let roomName;
+
+function addMessage(message) {
+  const ul = room.querySelector("ul");
+  const li = document.createElement("li");
+  li.innerText = message;
+  ul.appendChild(li);
 }
 
-function handleOpen() {
-  console.log("연결!!");
+function handleMessageSubmit(event) {
+  event.preventDefault();
+  const input = room.querySelector("#msg input"); //html의 msg의 input 내용을 가져옴
+  const value = input.value;
+  socket.emit("new_message", input.value, roomName, () => {
+    //백엔드로 new_message이벤트를 input.value와 함께 보냄
+    addMessage(`You: ${value}`);
+  });
+  input.value = "";
 }
 
-socket.addEventListener("open", handleOpen); //연결이 발생하면 실행되는 코드
+function handleNicknameSubmit(event) {
+  event.preventDefault();
+  const input = room.querySelector("#name input");
+  const value = input.value;
+  socket.emit("nickname", input.value);
+}
 
-//아래 파라미터의 message는 많은 데이터를 품고 있다. 이중에서 data에 해당하는 것은 server에 정의된 hello다.
-//서버로부터 메시지를 받으면 발생한다.
-socket.addEventListener("message", (message) => {
-  const li = document.createElement("li"); //프론트엔드에서 li에 해당하는 입력을 가져옴
-  li.innerText = message.data; //li안의 택스트를 메시지의 데이터에 넣음
-  messageList.append(li); //위에 선언된 메시지리스트에 적용
-  //console.log("프론트엔드, 메시지를 받았습니다.", message.data, "서버로부터");
+function showRoom(msg) {
+  welcome.hidden = true;
+  room.hidden = false;
+  const h3 = room.querySelector("h3");
+  h3.innerText = `Room ${roomName}`;
+  const msgForm = room.querySelector("#msg");
+  const nameForm = room.querySelector("#name");
+  msgForm.addEventListener("submit", handleMessageSubmit);
+  nameForm.addEventListener("submit", handleNicknameSubmit);
+}
+
+function handleRoomSubmit(event) {
+  event.preventDefault();
+  const input = form.querySelector("input");
+
+  socket.emit("enter_room", input.value, showRoom);
+  //socketIO에서는 send가 아닌 emit을 쓴다.
+  //소켓 IO에서는 이벤트를 보내줄 수도 있다 (enter_room), 객체를 보내줄 수도 있다.
+  roomName = input.value;
+  input.value = "";
+}
+form.addEventListener("submit", handleRoomSubmit);
+
+socket.on("welcome", (user, newCount) => {
+  const h3 = room.querySelector("h3");
+  h3.innerText = `Room ${roomName} (${newCount})`;
+  //welcome 이벤트를 실행
+  addMessage(`프론트: ${user}가 왔습니다`);
 });
 
-//연결이 끝날 경우(서버를 터트렸다던가) 발생하는 이벤트
-socket.addEventListener("close", () => {
-  console.log("프론트엔드, 연결이 끊어졌습니다!");
+socket.on("bye", (left, newCount) => {
+  const h3 = room.querySelector("h3");
+  h3.innerText = `Room ${roomName} (${newCount})`;
+  //bye 이벤트를 실행
+  addMessage(`프론트: ${left}가 떠났습니다.`);
 });
 
-// setTimeout(() => {
-//   socket.send("벡엔드, 10초가 지났습니다!!");
-// }, 10000);
+socket.on("new_message", addMessage);
+socket.on("room_change", (rooms) => {
+  const roomList = welcome.querySelector("ul");
+  roomList.innerHTML = "";
+  if (rooms.length === 0) {
+    return;
+  }
 
-//백엔드로 보냄
-function handleSubmit(event) {
-  event.preventDefault();
-  const input = messageForm.querySelector("input"); //위에 정의된 메시지폼에서 입력을 가져옴
-  socket.send(makeMessage("new_message", input.value)); //백엔드에 내용을 보낸다.
-  console.log("프론트엔드, 채팅내용을 출력합니다. ==", input.value); //채팅창에서 보낸 글이 콘솔로 출력됌
-  input.value = ""; //채팅창에서 보내기 버튼을 누르면 입력창을 비워준다.
-}
-
-function handleNickSubmit(event) {
-  event.preventDefault();
-  const input = nickForm.querySelector("input");
-  socket.send(makeMessage("nickname", input.value));
-}
-
-messageForm.addEventListener("submit", handleSubmit);
-
-nickForm.addEventListener("submit", handleNickSubmit);
+  rooms.forEach((room) => {
+    const li = document.createElement("li");
+    li.innerText = room;
+    roomList.append(li);
+  });
+});

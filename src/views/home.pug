@@ -10,11 +10,21 @@ html(lang="en")
         header
             h1 Tarel
         main
-            form#nick
-                input(type="text", placeholder="닉네임 적기", required="")
-                button 저장
-            ul
-            form#message
-                input(type="text", placeholder="메시지 적기", required="")
-                button 보내기
+            div#welcome
+                form
+                    input(placeholder="방제", required, type="text")
+                    button 방 입장
+                h4 Open Rooms
+                ul
+            div#room
+                h3
+                ul 
+                form#name
+                    input(placeholder="이름", required, type="text")
+                    button 저장
+                form#msg
+                    input(placeholder="메시지", required, type="text")
+                    button 보내기
+
+        script(src="/socket.io/socket.io.js")
         script(src="/public/js/app.js")
